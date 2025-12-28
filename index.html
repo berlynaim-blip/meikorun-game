@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>MEIKO Arcade</title>
+
+<!-- Telegram WebApp -->
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+<style>
+body {
+  margin: 0;
+  background: linear-gradient(160deg, #0f172a, #1e293b);
+  color: #f8fafc;
+  font-family: system-ui, sans-serif;
+  overflow: hidden;
+}
+
+#game {
+  max-width: 420px;
+  margin: auto;
+  height: 100vh;
+  position: relative;
+}
+
+header {
+  text-align: center;
+  padding: 12px;
+  font-weight: 600;
+}
+
+canvas {
+  background: radial-gradient(circle at top, #1e293b, #020617);
+  border-radius: 16px;
+  display: block;
+  margin: 0 auto;
+}
+
+#ui {
+  position: absolute;
+  bottom: 20px;
+  width: 100%;
+  display: flex;
+  justify-content: space-around;
+}
+
+button {
+  padding: 14px 18px;
+  font-size: 16px;
+  border: none;
+  border-radius: 14px;
+  background: #f59e0b;
+  color: #020617;
+  font-weight: 600;
+}
+
+#overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(2,6,23,0.85);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+.hidden { display: none; }
+</style>
+</head>
+
+<body>
+<div id="game">
+  <header>
+    🚀 MEIKO ARCADE<br>
+    Score: <span id="score">0</span> |
+    Best: <span id="best">0</span>
+  </header>
+
+  <canvas id="canvas" width="360" height="480"></canvas>
+
+  <div id="ui">
+    <button onclick="move(-1)">⬅</button>
+    <button onclick="move(1)">➡</button>
+  </div>
+
+  <div id="overlay">
+    <h2>MEIKO</h2>
+    <button onclick="startGame()">Start</button>
+  </div>
+</div>
+
+<script>
+const tg = window.Telegram?.WebApp;
+tg?.expand();
+tg?.ready();
+
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+let player, obstacles, score, running;
+let best = Number(localStorage.getItem("meiko_best") || 0);
+
+document.getElementById("best").innerText = best;
+
+function reset() {
+  player = { x: 160, y: 430, w: 40, h: 40 };
+  obstacles = [];
+  score = 0;
+  running = true;
+}
+
+function startGame() {
+  reset();
+  document.getElementById("overlay").classList.add("hidden");
+  loop();
+}
+
+function endGame() {
+  running = false;
+  best = Math.max(best, score);
+  localStorage.setItem("meiko_best", best);
+  document.getElementById("best").innerText = best;
+  document.getElementById("overlay").classList.remove("hidden");
+}
+
+function move(dir) {
+  player.x += dir * 40;
+  player.x = Math.max(0, Math.min(canvas.width - player.w, player.x));
+  tg?.HapticFeedback?.impactOccurred("light");
+}
+
+function spawnObstacle() {
+  obstacles.push({
+    x: Math.random() * (canvas.width - 30),
+    y: -30,
+    s: 3 + Math.random() * 3
+  });
+}
+
+function loop() {
+  if (!running) return;
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Player
+  ctx.fillStyle = "#facc15";
+  ctx.fillRect(player.x, player.y, player.w, player.h);
+
+  // Obstacles
+  ctx.fillStyle = "#38bdf8";
+  obstacles.forEach(o => {
+    o.y += o.s;
+    ctx.fillRect(o.x, o.y, 30, 30);
+
+    if (
+      o.x < player.x + player.w &&
+      o.x + 30 > player.x &&
+      o.y < player.y + player.h &&
+      o.y + 30 > player.y
+    ) {
+      endGame();
+    }
+  });
+
+  obstacles = obstacles.filter(o => o.y < canvas.height);
+
+  if (Math.random() < 0.03) spawnObstacle();
+
+  score++;
+  document.getElementById("score").innerText = score;
+
+  requestAnimationFrame(loop);
+}
+</script>
+</body>
+</html>
