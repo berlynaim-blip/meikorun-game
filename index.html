@@ -8,7 +8,6 @@
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
 <style>
-/* --- Base --- */
 body {
   margin: 0;
   font-family: 'Segoe UI', system-ui, sans-serif;
@@ -32,10 +31,9 @@ h1 {
   margin: 12px 0 24px;
   font-weight: 700;
   font-size: 28px;
-  letter-spacing: 1px;
 }
 
-/* --- Hub Cards --- */
+/* Hub cards */
 .grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -65,7 +63,7 @@ h1 {
   margin-bottom: 10px;
 }
 
-/* --- Canvas & Game --- */
+/* Canvas & game */
 canvas {
   display: block;
   width: 100%;
@@ -92,21 +90,6 @@ button:hover {
   background: #d97706;
 }
 
-/* --- Overlay --- */
-#overlay {
-  position: absolute;
-  inset: 0;
-  background: rgba(2,6,23,0.85);
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  z-index: 10;
-}
-
-.hidden { display: none; }
-
-/* --- Score / Lives --- */
 #hud {
   display: flex;
   justify-content: space-between;
@@ -116,7 +99,7 @@ button:hover {
   font-weight: 600;
 }
 
-/* --- Leaderboard --- */
+/* Leaderboard */
 #leaderboard {
   margin-top: 16px;
   background: #1e293b;
@@ -134,6 +117,8 @@ button:hover {
 #leaderboard ol {
   padding-left: 16px;
 }
+
+.hidden { display: none; }
 </style>
 </head>
 
@@ -145,20 +130,16 @@ button:hover {
     <h1>🎮 MEIKO ARCADE</h1>
     <div class="grid">
       <div class="card" onclick="startGame('dodge')">
-        <span>🚀</span>
-        Dodge Run
+        <span>🚀</span>Dodge Run
       </div>
       <div class="card" onclick="startGame('tap')">
-        <span>⚡</span>
-        Tap Speed
+        <span>⚡</span>Tap Speed
       </div>
       <div class="card">
-        <span>🔒</span>
-        Coming Soon
+        <span>🔒</span>Coming Soon
       </div>
-      <div class="card">
-        <span>🏆</span>
-        Leaderboard
+      <div class="card" onclick="toggleLeaderboard()">
+        <span>🏆</span>Leaderboard
       </div>
     </div>
     <div id="leaderboard" class="hidden">
@@ -183,7 +164,7 @@ button:hover {
 const tg = window.Telegram?.WebApp;
 tg?.expand();
 tg?.ready();
-tg?.lockOrientation("portrait");
+tg?.lockOrientation?.("portrait");
 
 const hub = document.getElementById("hub");
 const game = document.getElementById("game");
@@ -194,25 +175,34 @@ let loopId;
 let currentGame;
 let lives = 4;
 
-/* --- Leaderboard --- */
-let leaderboard = JSON.parse(localStorage.getItem('meiko_leaderboard') || '[]');
+// Leaderboard
+let leaderboard = [];
+try {
+  leaderboard = JSON.parse(localStorage.getItem('meiko_leaderboard') || '[]');
+} catch(e){ leaderboard = []; }
 
-function updateLeaderboard(score) {
+function updateLeaderboard(score){
   const user = tg?.initDataUnsafe?.user?.username || 'Player';
   leaderboard.push({ user, score });
   leaderboard.sort((a,b)=>b.score-a.score);
-  leaderboard = leaderboard.slice(0,5); // top 5
+  leaderboard = leaderboard.slice(0,5);
   localStorage.setItem('meiko_leaderboard', JSON.stringify(leaderboard));
   renderLeaderboard();
 }
 
-function renderLeaderboard() {
+function renderLeaderboard(){
   const list = document.getElementById('leaderboardList');
   list.innerHTML = leaderboard.map(e=>`<li>${e.user}: ${e.score}</li>`).join('');
 }
 
-/* --- Hub/Game Navigation --- */
-function startGame(type) {
+function toggleLeaderboard(){
+  const lb = document.getElementById('leaderboard');
+  lb.classList.toggle('hidden');
+  renderLeaderboard();
+}
+
+// Navigation
+function startGame(type){
   currentGame = type;
   hub.classList.add("hidden");
   game.classList.remove("hidden");
@@ -223,7 +213,7 @@ function startGame(type) {
   if(type==='tap') startTap();
 }
 
-function backToHub() {
+function backToHub(){
   cancelAnimationFrame(loopId);
   ctx.clearRect(0,0,canvas.width,canvas.height);
   game.classList.add("hidden");
@@ -231,34 +221,33 @@ function backToHub() {
   renderLeaderboard();
 }
 
-/* --- Dodge Game --- */
-function startDodge() {
+// Dodge Run Game
+function startDodge(){
   let player = { x: 160, y: 420, w: 40, h: 40 };
   let obs = [];
   let score = 0;
 
   canvas.onclick = () => {
     player.x = (player.x < 180) ? 260 : 80;
-    tg?.HapticFeedback?.impactOccurred("light");
+    if(tg?.HapticFeedback) tg.HapticFeedback.impactOccurred("light");
   };
 
-  function spawnObstacle() {
+  function spawnObstacle(){
     obs.push({ x: Math.random() * (canvas.width - 30), y: -30, s: 3 + Math.random()*3 });
   }
 
-  function loop() {
+  function loop(){
     ctx.clearRect(0,0,canvas.width,canvas.height);
 
-    // Player
+    // Draw player
     ctx.fillStyle = "#facc15";
     ctx.fillRect(player.x, player.y, player.w, player.h);
 
-    // Obstacles
+    // Draw obstacles
     ctx.fillStyle = "#38bdf8";
     obs.forEach(o=>{
       o.y += o.s;
       ctx.fillRect(o.x,o.y,30,30);
-
       if(o.x<player.x+player.w && o.x+30>player.x && o.y<player.y+player.h && o.y+30>player.y){
         lives--;
         document.getElementById('lives').innerText = lives;
@@ -281,17 +270,17 @@ function startDodge() {
   loop();
 }
 
-/* --- Tap Speed Game --- */
-function startTap() {
+// Tap Speed Game
+function startTap(){
   let time = 300;
   let taps = 0;
 
   canvas.onclick = () => {
     taps++;
-    tg?.HapticFeedback?.impactOccurred("light");
+    if(tg?.HapticFeedback) tg.HapticFeedback.impactOccurred("light");
   };
 
-  function loop() {
+  function loop(){
     ctx.clearRect(0,0,canvas.width,canvas.height);
     ctx.fillStyle="#f8fafc";
     ctx.font="28px sans-serif";
@@ -309,7 +298,7 @@ function startTap() {
   loop();
 }
 
-/* --- Initial leaderboard render --- */
+// Initial leaderboard render
 renderLeaderboard();
 </script>
 </body>
