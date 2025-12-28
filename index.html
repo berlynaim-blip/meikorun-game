@@ -1,60 +1,98 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>MEIKO Arcade</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MEIKO Arcade Hub</title>
 
-<!-- Telegram WebApp -->
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
 <style>
+/* --- Base --- */
 body {
   margin: 0;
+  font-family: 'Segoe UI', system-ui, sans-serif;
   background: linear-gradient(160deg, #0f172a, #1e293b);
   color: #f8fafc;
-  font-family: system-ui, sans-serif;
-  overflow: hidden;
+  overflow-x: hidden;
 }
 
-#game {
+.app {
   max-width: 420px;
   margin: auto;
-  height: 100vh;
-  position: relative;
-}
-
-header {
-  text-align: center;
-  padding: 12px;
-  font-weight: 600;
-}
-
-canvas {
-  background: radial-gradient(circle at top, #1e293b, #020617);
-  border-radius: 16px;
-  display: block;
-  margin: 0 auto;
-}
-
-#ui {
-  position: absolute;
-  bottom: 20px;
-  width: 100%;
+  min-height: 100vh;
+  padding: 16px;
   display: flex;
-  justify-content: space-around;
+  flex-direction: column;
+  align-items: center;
+}
+
+h1 {
+  text-align: center;
+  margin: 12px 0 24px;
+  font-weight: 700;
+  font-size: 28px;
+  letter-spacing: 1px;
+}
+
+/* --- Hub Cards --- */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  width: 100%;
+}
+
+.card {
+  background: linear-gradient(145deg, #1e293b, #0f172a);
+  border-radius: 16px;
+  padding: 24px 12px;
+  text-align: center;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.15s, background 0.3s;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+}
+
+.card:hover {
+  transform: translateY(-3px);
+  background: linear-gradient(145deg, #28354a, #1c2536);
+}
+
+.card span {
+  display: block;
+  font-size: 36px;
+  margin-bottom: 10px;
+}
+
+/* --- Canvas & Game --- */
+canvas {
+  display: block;
+  width: 100%;
+  max-width: 360px;
+  height: auto;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #0f172a 0%, #020617 100%);
+  margin: 20px auto;
 }
 
 button {
-  padding: 14px 18px;
-  font-size: 16px;
+  padding: 12px 20px;
   border: none;
   border-radius: 14px;
   background: #f59e0b;
   color: #020617;
+  font-size: 16px;
   font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
 }
 
+button:hover {
+  background: #d97706;
+}
+
+/* --- Overlay --- */
 #overlay {
   position: absolute;
   inset: 0;
@@ -63,115 +101,216 @@ button {
   flex-direction: column;
   justify-content: center;
   align-items: center;
+  z-index: 10;
 }
 
 .hidden { display: none; }
+
+/* --- Score / Lives --- */
+#hud {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  max-width: 360px;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+/* --- Leaderboard --- */
+#leaderboard {
+  margin-top: 16px;
+  background: #1e293b;
+  padding: 12px;
+  border-radius: 14px;
+  width: 100%;
+}
+
+#leaderboard h3 {
+  margin-top: 0;
+  text-align: center;
+  margin-bottom: 8px;
+}
+
+#leaderboard ol {
+  padding-left: 16px;
+}
 </style>
 </head>
 
 <body>
-<div id="game">
-  <header>
-    🚀 MEIKO ARCADE<br>
-    Score: <span id="score">0</span> |
-    Best: <span id="best">0</span>
-  </header>
+<div class="app">
 
-  <canvas id="canvas" width="360" height="480"></canvas>
-
-  <div id="ui">
-    <button onclick="move(-1)">⬅</button>
-    <button onclick="move(1)">➡</button>
+  <!-- HUB -->
+  <div id="hub">
+    <h1>🎮 MEIKO ARCADE</h1>
+    <div class="grid">
+      <div class="card" onclick="startGame('dodge')">
+        <span>🚀</span>
+        Dodge Run
+      </div>
+      <div class="card" onclick="startGame('tap')">
+        <span>⚡</span>
+        Tap Speed
+      </div>
+      <div class="card">
+        <span>🔒</span>
+        Coming Soon
+      </div>
+      <div class="card">
+        <span>🏆</span>
+        Leaderboard
+      </div>
+    </div>
+    <div id="leaderboard" class="hidden">
+      <h3>🏆 Top Scores</h3>
+      <ol id="leaderboardList"></ol>
+    </div>
   </div>
 
-  <div id="overlay">
-    <h2>MEIKO</h2>
-    <button onclick="startGame()">Start</button>
+  <!-- GAME SCREEN -->
+  <div id="game" class="hidden">
+    <div id="hud">
+      <div>Score: <span id="score">0</span></div>
+      <div>Lives: <span id="lives">4</span></div>
+    </div>
+    <canvas id="canvas" width="360" height="480"></canvas>
+    <button onclick="backToHub()">⬅ Back</button>
   </div>
+
 </div>
 
 <script>
 const tg = window.Telegram?.WebApp;
 tg?.expand();
 tg?.ready();
+tg?.lockOrientation("portrait");
 
+const hub = document.getElementById("hub");
+const game = document.getElementById("game");
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 
-let player, obstacles, score, running;
-let best = Number(localStorage.getItem("meiko_best") || 0);
+let loopId;
+let currentGame;
+let lives = 4;
 
-document.getElementById("best").innerText = best;
+/* --- Leaderboard --- */
+let leaderboard = JSON.parse(localStorage.getItem('meiko_leaderboard') || '[]');
 
-function reset() {
-  player = { x: 160, y: 430, w: 40, h: 40 };
-  obstacles = [];
-  score = 0;
-  running = true;
+function updateLeaderboard(score) {
+  const user = tg?.initDataUnsafe?.user?.username || 'Player';
+  leaderboard.push({ user, score });
+  leaderboard.sort((a,b)=>b.score-a.score);
+  leaderboard = leaderboard.slice(0,5); // top 5
+  localStorage.setItem('meiko_leaderboard', JSON.stringify(leaderboard));
+  renderLeaderboard();
 }
 
-function startGame() {
-  reset();
-  document.getElementById("overlay").classList.add("hidden");
+function renderLeaderboard() {
+  const list = document.getElementById('leaderboardList');
+  list.innerHTML = leaderboard.map(e=>`<li>${e.user}: ${e.score}</li>`).join('');
+}
+
+/* --- Hub/Game Navigation --- */
+function startGame(type) {
+  currentGame = type;
+  hub.classList.add("hidden");
+  game.classList.remove("hidden");
+  lives = 4;
+  document.getElementById('lives').innerText = lives;
+  document.getElementById('score').innerText = 0;
+  if(type==='dodge') startDodge();
+  if(type==='tap') startTap();
+}
+
+function backToHub() {
+  cancelAnimationFrame(loopId);
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  game.classList.add("hidden");
+  hub.classList.remove("hidden");
+  renderLeaderboard();
+}
+
+/* --- Dodge Game --- */
+function startDodge() {
+  let player = { x: 160, y: 420, w: 40, h: 40 };
+  let obs = [];
+  let score = 0;
+
+  canvas.onclick = () => {
+    player.x = (player.x < 180) ? 260 : 80;
+    tg?.HapticFeedback?.impactOccurred("light");
+  };
+
+  function spawnObstacle() {
+    obs.push({ x: Math.random() * (canvas.width - 30), y: -30, s: 3 + Math.random()*3 });
+  }
+
+  function loop() {
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+
+    // Player
+    ctx.fillStyle = "#facc15";
+    ctx.fillRect(player.x, player.y, player.w, player.h);
+
+    // Obstacles
+    ctx.fillStyle = "#38bdf8";
+    obs.forEach(o=>{
+      o.y += o.s;
+      ctx.fillRect(o.x,o.y,30,30);
+
+      if(o.x<player.x+player.w && o.x+30>player.x && o.y<player.y+player.h && o.y+30>player.y){
+        lives--;
+        document.getElementById('lives').innerText = lives;
+        o.y = -30; // reset obstacle
+        if(lives<=0){
+          updateLeaderboard(score);
+          backToHub();
+        }
+      }
+    });
+
+    obs = obs.filter(o=>o.y<canvas.height);
+    if(Math.random()<0.03) spawnObstacle();
+
+    score++;
+    document.getElementById('score').innerText = score;
+
+    loopId = requestAnimationFrame(loop);
+  }
   loop();
 }
 
-function endGame() {
-  running = false;
-  best = Math.max(best, score);
-  localStorage.setItem("meiko_best", best);
-  document.getElementById("best").innerText = best;
-  document.getElementById("overlay").classList.remove("hidden");
-}
+/* --- Tap Speed Game --- */
+function startTap() {
+  let time = 300;
+  let taps = 0;
 
-function move(dir) {
-  player.x += dir * 40;
-  player.x = Math.max(0, Math.min(canvas.width - player.w, player.x));
-  tg?.HapticFeedback?.impactOccurred("light");
-}
+  canvas.onclick = () => {
+    taps++;
+    tg?.HapticFeedback?.impactOccurred("light");
+  };
 
-function spawnObstacle() {
-  obstacles.push({
-    x: Math.random() * (canvas.width - 30),
-    y: -30,
-    s: 3 + Math.random() * 3
-  });
-}
+  function loop() {
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    ctx.fillStyle="#f8fafc";
+    ctx.font="28px sans-serif";
+    ctx.fillText("TAPS: "+taps, 110, 220);
+    ctx.fillText("TIME: "+Math.ceil(time/60), 110, 260);
 
-function loop() {
-  if (!running) return;
-
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-  // Player
-  ctx.fillStyle = "#facc15";
-  ctx.fillRect(player.x, player.y, player.w, player.h);
-
-  // Obstacles
-  ctx.fillStyle = "#38bdf8";
-  obstacles.forEach(o => {
-    o.y += o.s;
-    ctx.fillRect(o.x, o.y, 30, 30);
-
-    if (
-      o.x < player.x + player.w &&
-      o.x + 30 > player.x &&
-      o.y < player.y + player.h &&
-      o.y + 30 > player.y
-    ) {
-      endGame();
+    time--;
+    if(time<=0){
+      updateLeaderboard(taps);
+      backToHub();
+      return;
     }
-  });
-
-  obstacles = obstacles.filter(o => o.y < canvas.height);
-
-  if (Math.random() < 0.03) spawnObstacle();
-
-  score++;
-  document.getElementById("score").innerText = score;
-
-  requestAnimationFrame(loop);
+    loopId = requestAnimationFrame(loop);
+  }
+  loop();
 }
+
+/* --- Initial leaderboard render --- */
+renderLeaderboard();
 </script>
 </body>
 </html>
